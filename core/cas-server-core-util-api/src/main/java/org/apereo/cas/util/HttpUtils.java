@@ -19,6 +19,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.springframework.http.HttpMethod;
@@ -176,8 +177,16 @@ public class HttpUtils {
         if ("post".equalsIgnoreCase(method)) {
             val request = new HttpPost(uri);
             if (StringUtils.isNotBlank(entity)) {
-                val stringEntity = new StringEntity(entity);
-                request.setEntity(stringEntity);
+            	// ThachLN
+            	// val stringEntity = new StringEntity(entity);
+
+            	if (entity.startsWith("{")) {
+            		val stringEntity = new StringEntity(entity, ContentType.APPLICATION_JSON);
+            		request.setEntity(stringEntity);
+            	} else {
+            		val stringEntity = new StringEntity(entity);
+            		request.setEntity(stringEntity);
+            	}
             }
             return request;
         }

@@ -79,14 +79,19 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
 
         var response = (HttpResponse) null;
         try {
+        	// Request: {"username":"admin","password":"test123","rememberMe":true,"ldap":true}
+        	String jsonBody = String.format("{'username':'%s','password':'%s','rememberMe':true,'ldap':true}", credential.getUsername(), credential.getPassword());
             val exec = HttpUtils.HttpExecutionRequest.builder()
                 .basicAuthPassword(credential.getUsername())
                 .basicAuthUsername(credential.getPassword())
+                .entity(jsonBody)
                 .method(HttpMethod.POST)
                 .url(properties.getUri())
                 .build();
             response = HttpUtils.execute(exec);
             val status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
+
+            // Parse result json {"id_token":"...","login":"admin"}
             switch (Objects.requireNonNull(status)) {
                 case OK:
                     return buildPrincipalFromResponse(credential, response);
