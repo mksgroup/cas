@@ -1,0 +1,4 @@
+@ECHO OFF
+SET JAVA_HOME=D:/RunNow/jdk-11.0.8
+SET PATH=%JAVA_HOME%/bin;%PATH%
+code .
