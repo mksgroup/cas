@@ -7,6 +7,10 @@ dependencies {
     implementation project(":core:cas-server-core-util-api") 
     implementation project(":webapp:cas-server-webapp-init")
 
+    implementation project(":support:cas-server-support-json-service-registry")
+    implementation project(":support:cas-server-support-jdbc")
+    implementation project(":support:cas-server-support-jdbc-authentication")
+
     testImplementation project(path: ":core:cas-server-core-services", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core-authentication-api", configuration: "tests")
