@@ -58,4 +58,14 @@ public class RestAuthenticationProperties implements Serializable {
      * and the lifecycle in which it can be invoked or activated.
      */
     private AuthenticationHandlerStates state = AuthenticationHandlerStates.ACTIVE;
+
+    /**
+     * Remember password.
+     */
+    private boolean isRemember;
+    
+    /**
+     * Enable LDAP.
+     */
+    private boolean isLdap;
 }

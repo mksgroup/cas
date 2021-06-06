@@ -17,6 +17,7 @@ import org.apereo.cas.util.HttpUtils;
 import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -37,7 +38,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -80,7 +83,8 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
         var response = (HttpResponse) null;
         try {
         	// Request: {"username":"admin","password":"test123","rememberMe":true,"ldap":true}
-        	String jsonBody = String.format("{'username':'%s','password':'%s','rememberMe':true,'ldap':true}", credential.getUsername(), credential.getPassword());
+        	String jsonBody = String.format("{\"username\":\"%s\",\"password\":\"%s\",\"remember\":%s,\"ldap\":%s}", credential.getUsername(), credential.getPassword(), properties.isRemember(), properties.isLdap());
+//        	String jsonBody = String.format("{'username':'%s','password':'%s','remember':,'ldap':}", credential.getUsername(), credential.getPassword());
             val exec = HttpUtils.HttpExecutionRequest.builder()
                 .basicAuthPassword(credential.getUsername())
                 .basicAuthUsername(credential.getPassword())
@@ -88,9 +92,13 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
                 .method(HttpMethod.POST)
                 .url(properties.getUri())
                 .build();
+            LOGGER.debug("Connecting to " + properties.getUri());
+            LOGGER.debug("jsonBody=" + jsonBody);
             response = HttpUtils.execute(exec);
+            LOGGER.debug("response=" + response);
             val status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
 
+            LOGGER.debug("status= {}", status);
             // Parse result json {"id_token":"...","login":"admin"}
             switch (Objects.requireNonNull(status)) {
                 case OK:
@@ -128,8 +136,33 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
         try {
             val result = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
             LOGGER.debug("REST authentication response received: [{}]", result);
-            val principalFromRest = MAPPER.readValue(result, Principal.class);
-            val principal = principalFactory.createPrincipal(principalFromRest.getId(), principalFromRest.getAttributes());
+            // val principalFromRest = MAPPER.readValue(result, Principal.class);
+            
+            JsonNode jsonNode = MAPPER.readTree(result);
+            
+            String principalFromRest = jsonNode.get("login").asText();
+            
+            LOGGER.debug("principalFromRest={}", principalFromRest);
+            // val principal = principalFactory.createPrincipal(principalFromRest.getId(), principalFromRest.getAttributes());
+            Map<String, List<Object>> mapAttributes = new HashMap<String, List<Object>>();
+            String loginValue = jsonNode.get("id_token").asText();
+            
+            LOGGER.debug("loginValue={}", loginValue);
+            
+            List<Object> listAttribute = new ArrayList<Object>(1);
+            
+            if (loginValue != null) {
+            	listAttribute.add(loginValue);
+            	mapAttributes.put("login", listAttribute);
+            
+            }
+            
+            LOGGER.debug("principalFactory={}", principalFactory);
+            // val principal = principalFactory.createPrincipal(principalFromRest, principalFromRest.getAttributes());
+            val principal = principalFactory.createPrincipal(principalFromRest, mapAttributes);
+            
+            LOGGER.debug("principal={}", principal);
+            
             return createHandlerResult(credential, principal, getWarnings(response));
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
@@ -146,21 +179,28 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
     protected List<MessageDescriptor> getWarnings(final HttpResponse authenticationResponse) {
         val messageDescriptors = new ArrayList<MessageDescriptor>(2);
 
-        val passwordExpirationDate = authenticationResponse.getFirstHeader(HEADER_NAME_CAS_PASSWORD_EXPIRATION_DATE).getValue();
-        if (passwordExpirationDate != null) {
-            val days = Duration.between(Instant.now(Clock.systemUTC()), DateTimeUtils.convertToZonedDateTime(passwordExpirationDate)).toDays();
-            messageDescriptors.add(new PasswordExpiringWarningMessageDescriptor(null, days));
+        LOGGER.debug("authenticationResponse={}; messageDescriptors={}", authenticationResponse, messageDescriptors);
+        try {
+	        val passwordExpirationDate = authenticationResponse.getFirstHeader(HEADER_NAME_CAS_PASSWORD_EXPIRATION_DATE).getValue();
+	        if (passwordExpirationDate != null) {
+	            val days = Duration.between(Instant.now(Clock.systemUTC()), DateTimeUtils.convertToZonedDateTime(passwordExpirationDate)).toDays();
+	            messageDescriptors.add(new PasswordExpiringWarningMessageDescriptor(null, days));
+	        }
+	
+	        val warnings = authenticationResponse.getHeaders(HEADER_NAME_CAS_WARNING);
+	        if (warnings != null) {
+	            Arrays.stream(warnings)
+	                .map(NameValuePair::getValue)
+	                .map(DefaultMessageDescriptor::new)
+	                .forEach(messageDescriptors::add);
+	        }
+	
+	        LOGGER.debug("messageDescriptors={}", messageDescriptors);
+	        return messageDescriptors;
+        } catch (Throwable th) {
+        	LoggingUtils.error(LOGGER, th);
+        	return new ArrayList<MessageDescriptor>(0);
         }
-
-        val warnings = authenticationResponse.getHeaders(HEADER_NAME_CAS_WARNING);
-        if (warnings != null) {
-            Arrays.stream(warnings)
-                .map(NameValuePair::getValue)
-                .map(DefaultMessageDescriptor::new)
-                .forEach(messageDescriptors::add);
-        }
-
-        return messageDescriptors;
     }
 }
 

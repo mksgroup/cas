@@ -106,6 +106,7 @@ public class HttpUtils {
     public static HttpResponse execute(final HttpExecutionRequest execution) {
         try {
             val uri = buildHttpUri(execution.getUrl().trim(), execution.getParameters());
+            LOGGER.debug("uri={}", uri);
             val request = getHttpRequestByMethod(execution.getMethod().name().toLowerCase().trim(), execution.getEntity(), uri);
             execution.getHeaders().forEach((k, v) -> request.addHeader(k, v.toString()));
             prepareHttpRequest(request, execution);
@@ -176,10 +177,10 @@ public class HttpUtils {
     private static HttpUriRequest getHttpRequestByMethod(final String method, final String entity, final URI uri) {
         if ("post".equalsIgnoreCase(method)) {
             val request = new HttpPost(uri);
+
             if (StringUtils.isNotBlank(entity)) {
             	// ThachLN
             	// val stringEntity = new StringEntity(entity);
-
             	if (entity.startsWith("{")) {
             		val stringEntity = new StringEntity(entity, ContentType.APPLICATION_JSON);
             		request.setEntity(stringEntity);
