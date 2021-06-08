@@ -83,22 +83,30 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
         var response = (HttpResponse) null;
         try {
         	// Request: {"username":"admin","password":"test123","rememberMe":true,"ldap":true}
-        	String jsonBody = String.format("{\"username\":\"%s\",\"password\":\"%s\",\"remember\":%s,\"ldap\":%s}", credential.getUsername(), credential.getPassword(), properties.isRemember(), properties.isLdap());
-//        	String jsonBody = String.format("{'username':'%s','password':'%s','remember':,'ldap':}", credential.getUsername(), credential.getPassword());
-            val exec = HttpUtils.HttpExecutionRequest.builder()
-                .basicAuthPassword(credential.getUsername())
-                .basicAuthUsername(credential.getPassword())
-                .entity(jsonBody)
-                .method(HttpMethod.POST)
-                .url(properties.getUri())
-                .build();
-            LOGGER.debug("Connecting to " + properties.getUri());
-            LOGGER.debug("jsonBody=" + jsonBody);
-            response = HttpUtils.execute(exec);
-            LOGGER.debug("response=" + response);
-            val status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
+//        	String jsonBody = String.format("{\"username\":\"%s\",\"password\":\"%s\",\"remember\":%s,\"ldap\":%s}", credential.getUsername(), credential.getPassword(), properties.isRemember(), properties.isLdap());
+//            val exec = HttpUtils.HttpExecutionRequest.builder()
+//                .basicAuthPassword(credential.getUsername())
+//                .basicAuthUsername(credential.getPassword())
+//                .entity(jsonBody)
+//                .method(HttpMethod.POST)
+//                .url(properties.getUri())
+//                .build();
+//            LOGGER.debug("Connecting to " + properties.getUri());
+//            LOGGER.debug("jsonBody=" + jsonBody);
+//            response = HttpUtils.execute(exec);
+//            LOGGER.debug("response=" + response);
+//            val status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
+//
+//            LOGGER.debug("status= {}", status);
 
-            LOGGER.debug("status= {}", status);
+        	response = resolve(credential.getUsername(), credential.getPassword(), properties.isRemember(), false);
+        	HttpStatus status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
+
+        	if (Objects.requireNonNull(status) == HttpStatus.UNAUTHORIZED) {
+        		LOGGER.info("Try to login with ldap=true");
+        		response = resolve(credential.getUsername(), credential.getPassword(), properties.isRemember(), true);
+        		status = HttpStatus.resolve(Objects.requireNonNull(response).getStatusLine().getStatusCode());
+        	}
             // Parse result json {"id_token":"...","login":"admin"}
             switch (Objects.requireNonNull(status)) {
                 case OK:
@@ -122,7 +130,18 @@ public class RestAuthenticationHandler extends AbstractUsernamePasswordAuthentic
             HttpUtils.close(response);
         }
     }
+    private  HttpResponse resolve(String username, String password, boolean isRemember, boolean isLdap) {
+    	String jsonBody = String.format("{\"username\":\"%s\",\"password\":\"%s\",\"remember\":%s,\"ldap\":%s}",username, password, isRemember, isLdap);
+        val exec = HttpUtils.HttpExecutionRequest.builder()
+            .basicAuthPassword(username)
+            .basicAuthUsername(password)
+            .entity(jsonBody)
+            .method(HttpMethod.POST)
+            .url(properties.getUri())
+            .build();
 
+        return HttpUtils.execute(exec);
+    }
     /**
      * Build principal from response.
      *
